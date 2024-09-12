@@ -130,8 +130,6 @@ const HEIGHT = phrases.length
 const CANVAS_WIDTH = Math.floor(WIDTH * 3)
 const CANVAS_HEIGHT = HEIGHT
 
-
-
 let canvas = new Array(CANVAS_WIDTH * CANVAS_HEIGHT).fill(".")
 
 function rotate(position, radian, tick) {
