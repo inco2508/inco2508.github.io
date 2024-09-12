@@ -17,9 +17,43 @@
     </main>
 
     <menu>
-        <li><a href="https://github.com/inco2508/inco2508.github.io">source</a></li>
-        <li><a href="https://github.com/inco2508">github</a></li>
+        <section id="left">
+            <li class="link"><a  href="https://github.com/inco2508/inco2508.github.io">source</a></li>
+            <li class="link"><a  href="https://github.com/inco2508">github</a></li>
+        </section>
+        
+        <section id="right">
+
+        </section>
     </menu>
+
+    <script>
+        (async () => {
+            let menu = document.querySelector("#right")
+            let req = await fetch("https://api.github.com/repos/inco2508/inco2508.github.io/branches/main")
+            let json = await req.json()
+
+            let li = document.createElement("li")
+            li.classList.add("github")
+
+            let avatarLink = document.createElement("a")
+            avatarLink.href = json.commit.author.html_url
+
+            let avatar = document.createElement("img")
+            avatar.src = json.commit.author.avatar_url
+
+            avatarLink.appendChild(avatar)
+          
+            let commitLink = document.createElement("a")
+            commitLink.href = json.commit.html_url
+            commitLink.innerText = `${json.commit.commit.message}`
+
+            li.appendChild(avatarLink)
+            li.appendChild(commitLink)
+
+            menu.appendChild(li)
+        })()
+    </script>
 
     <script type="module" src="/main.js"></script>
 </body>
