@@ -1,54 +1,236 @@
 let dt = 0
 let scale = 1
 let phrases = `
-Aliquam rhoncus imperdiet risus, sit amet venenatis lectus volutpat in.
-Praesent ac eros id eros porta dictum in in lorem. Etiam pulvinar volutpat dolor, vitae.
-Nam sodales, metus sit amet lacinia placerat, nulla lacus commodo.
-Quisque tincidunt elementum enim at laoreet. Maecenas congue porta augue.
-Ut scelerisque justo auctor, ornare sem sed, volutpat nibh. Donec dapibus posuere metus molestie pharetra. Vivamus et arcu facilisis, malesuada tortor ut, tincidunt eros. Aliquam.
-Donec quis sapien pretium, dignissim elit sed, tincidunt mi. Sed.
-Sed non tincidunt risus, vitae interdum neque. Morbi dictum ac.
-Aenean ullamcorper, ligula vitae viverra malesuada, ipsum metus sollicitudin leo.
-Nulla leo neque, lobortis a nulla a, ornare interdum felis. Sed in venenatis augue, vel.
-Vivamus in eros vel mi hendrerit iaculis. Integer nunc nunc, aliquet quis eros eu, vulputate mollis libero. Cras eget finibus quam. Praesent elit odio, iaculis.
-Fusce finibus cursus suscipit. Aenean venenatis eleifend massa, et porttitor.
-Sed vitae felis nisi. Cras blandit mi vitae erat euismod.
-Donec id quam congue, pulvinar ipsum vitae, sagittis tortor. Pellentesque ultricies facilisis sodales. Nulla vitae.
-In nunc leo, pharetra placerat laoreet eget, lacinia vel mauris.
-Nunc sit amet sagittis sem. Nam quis efficitur elit. Nullam sollicitudin gravida eros eget tincidunt.
-Praesent non nulla vehicula, accumsan risus sit amet, hendrerit nibh.
-Aliquam rhoncus imperdiet risus, sit amet venenatis lectus volutpat in.
-Praesent ac eros id eros porta dictum in in lorem. Etiam pulvinar volutpat dolor, vitae.
-Nam sodales, metus sit amet lacinia placerat, nulla lacus commodo. Nam sodales, metus sit amet lacinia placerat, nulla lacus commodo. Nam sodales, metus sit amet lacinia placerat, nulla lacus commodo.
-Quisque tincidunt elementum enim at laoreet. Maecenas congue porta augue.
-Ut scelerisque justo auctor, ornare sem sed, volutpat nibh. Donec dapibus posuere metus molestie pharetra. Vivamus et arcu facilisis, malesuada tortor ut, tincidunt eros. Aliquam.
-Donec quis sapien pretium, dignissim elit sed, tincidunt mi. Sed.
-Sed non tincidunt risus, vitae interdum neque. Morbi dictum ac.
-Aenean ullamcorper, ligula vitae viverra malesuada, ipsum metus sollicitudin leo.
-Nulla leo neque, lobortis a nulla a, ornare interdum felis. Sed in venenatis augue, vel.
-Vivamus in eros vel mi hendrerit iaculis. Integer nunc nunc, aliquet quis eros eu, vulputate mollis libero. Cras eget finibus quam. Praesent elit odio, iaculis.
-Fusce finibus cursus suscipit. Aenean venenatis eleifend massa, et porttitor.
-Sed vitae felis nisi. Cras blandit mi vitae erat euismod.
-Donec id quam congue, pulvinar ipsum vitae, sagittis tortor. Pellentesque ultricies facilisis sodales. Nulla vitae.
-In nunc leo, pharetra placerat laoreet eget, lacinia vel mauris.
-Nunc sit amet sagittis sem. Nam quis efficitur elit. Nullam sollicitudin gravida eros eget tincidunt.
-Praesent non nulla vehicula, accumsan risus sit amet, hendrerit nibh.
-Aliquam rhoncus imperdiet risus, sit amet venenatis lectus volutpat in.
-Praesent ac eros id eros porta dictum in in lorem. Etiam pulvinar volutpat dolor, vitae.
-Nam sodales, metus sit amet lacinia placerat, nulla lacus commodo.
-Quisque tincidunt elementum enim at laoreet. Maecenas congue porta augue.
-Ut scelerisque justo auctor, ornare sem sed, volutpat nibh. Donec dapibus posuere metus molestie pharetra. Vivamus et arcu facilisis, malesuada tortor ut, tincidunt eros. Aliquam.
-Donec quis sapien pretium, dignissim elit sed, tincidunt mi. Sed.
-Sed non tincidunt risus, vitae interdum neque. Morbi dictum ac.
-Aenean ullamcorper, ligula vitae viverra malesuada, ipsum metus sollicitudin leo.
-Nulla leo neque, lobortis a nulla a, ornare interdum felis. Sed in venenatis augue, vel.
-Vivamus in eros vel mi hendrerit iaculis. Integer nunc nunc, aliquet quis eros eu, vulputate mollis libero. Cras eget finibus quam. Praesent elit odio, iaculis.
-Fusce finibus cursus suscipit. Aenean venenatis eleifend massa, et porttitor.
-Sed vitae felis nisi. Cras blandit mi vitae erat euismod.
-Donec id quam congue, pulvinar ipsum vitae, sagittis tortor. Pellentesque ultricies facilisis sodales. Nulla vitae.
-In nunc leo, pharetra placerat laoreet eget, lacinia vel mauris.
-Nunc sit amet sagittis sem. Nam quis efficitur elit. Nullam sollicitudin gravida eros eget tincidunt.
-Praesent non nulla vehicula, accumsan risus sit amet, hendrerit nibh.
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+//go:generate bundle -o=h2_bundle.go -prefix=http2 -tags=!nethttpomithttp2 golang.org/x/net/http2
+
+package http
+
+import (
+  "io"
+  "strconv"
+  "strings"
+  "time"
+  "unicode/utf8"
+
+  "golang.org/x/net/http/httpguts"
+)
+
+// incomparable is a zero-width, non-comparable type. Adding it to a struct
+// makes that struct also non-comparable, and generally doesn't add
+// any size (as long as it's first).
+type incomparable [0]func()
+
+// maxInt64 is the effective "infinite" value for the Server and
+// Transport's byte-limiting readers.
+const maxInt64 = 1<<63 - 1
+
+// aLongTimeAgo is a non-zero time, far in the past, used for
+// immediate cancellation of network operations.
+var aLongTimeAgo = time.Unix(1, 0)
+
+// omitBundledHTTP2 is set by omithttp2.go when the nethttpomithttp2
+// build tag is set. That means h2_bundle.go isn't compiled in and we
+// shouldn't try to use it.
+var omitBundledHTTP2 bool
+
+// TODO(bradfitz): move common stuff here. The other files have accumulated
+// generic http stuff in random places.
+
+// contextKey is a value for use with context.WithValue. It's used as
+// a pointer so it fits in an interface{} without allocation.
+type contextKey struct {
+  name string
+}
+
+func (k *contextKey) String() string { return "net/http context value " + k.name }
+
+// Given a string of the form "host", "host:port", or "[ipv6::address]:port",
+// return true if the string includes a port.
+func hasPort(s string) bool { return strings.LastIndex(s, ":") > strings.LastIndex(s, "]") }
+
+// removeEmptyPort strips the empty port in ":port" to ""
+// as mandated by RFC 3986 Section 6.2.3.
+func removeEmptyPort(host string) string {
+  if hasPort(host) {
+    return strings.TrimSuffix(host, ":")
+  }
+  return host
+}
+
+func isNotToken(r rune) bool {
+  return !httpguts.IsTokenRune(r)
+}
+
+// stringContainsCTLByte reports whether s contains any ASCII control character.
+func stringContainsCTLByte(s string) bool {
+  for i := 0; i < len(s); i++ {
+    b := s[i]
+    if b < ' ' || b == 0x7f {
+      return true
+    }
+  }
+  return false
+}
+
+func hexEscapeNonASCII(s string) string {
+  newLen := 0
+  for i := 0; i < len(s); i++ {
+    if s[i] >= utf8.RuneSelf {
+      newLen += 3
+    } else {
+      newLen++
+    }
+  }
+  if newLen == len(s) {
+    return s
+  }
+  b := make([]byte, 0, newLen)
+  var pos int
+  for i := 0; i < len(s); i++ {
+    if s[i] >= utf8.RuneSelf {
+      if pos < i {
+        b = append(b, s[pos:i]...)
+      }
+      b = append(b, '%')
+      b = strconv.AppendInt(b, int64(s[i]), 16)
+      pos = i + 1
+    }
+  }
+  if pos < len(s) {
+    b = append(b, s[pos:]...)
+  }
+  return string(b)
+}
+
+// NoBody is an [io.ReadCloser] with no bytes. Read always returns EOF
+// and Close always returns nil. It can be used in an outgoing client
+// request to explicitly signal that a request has zero bytes.
+// An alternative, however, is to simply set [Request.Body] to nil.
+var NoBody = noBody{}
+
+type noBody struct{}
+
+func (noBody) Read([]byte) (int, error)         { return 0, io.EOF }
+func (noBody) Close() error                     { return nil }
+func (noBody) WriteTo(io.Writer) (int64, error) { return 0, nil }
+
+var (
+  // verify that an io.Copy from NoBody won't require a buffer:
+  _ io.WriterTo   = NoBody
+  _ io.ReadCloser = NoBody
+)
+
+// PushOptions describes options for [Pusher.Push].
+type PushOptions struct {
+  // Method specifies the HTTP method for the promised request.
+  // If set, it must be "GET" or "HEAD". Empty means "GET".
+  Method string
+
+  // Header specifies additional promised request headers. This cannot
+  // include HTTP/2 pseudo header fields like ":path" and ":scheme",
+  // which will be added automatically.
+  Header Header
+}
+
+// Pusher is the interface implemented by ResponseWriters that support
+// HTTP/2 server push. For more background, see
+// https://tools.ietf.org/html/rfc7540#section-8.2.
+type Pusher interface {
+// Push initiates an HTTP/2 server push. This constructs a synthetic
+// request using the given target and options, serializes that request
+// into a PUSH_PROMISE frame, then dispatches that request using the
+// server's request handler. If opts is nil, default options are used.
+//
+// The target must either be an absolute path (like "/path") or an absolute
+// URL that contains a valid host and the same scheme as the parent request.
+// If the target is a path, it will inherit the scheme and host of the
+// parent request.
+//
+// The HTTP/2 spec disallows recursive pushes and cross-authority pushes.
+// Push may or may not detect these invalid pushes; however, invalid
+// pushes will be detected and canceled by conforming clients.
+//
+// Handlers that wish to push URL X should call Push before sending any
+// data that may trigger a request for URL X. This avoids a race where the
+// client issues requests for X before receiving the PUSH_PROMISE for X.
+//
+// Push will run in a separate goroutine making the order of arrival
+// non-deterministic. Any required synchronization needs to be implemented
+// by the caller.
+//
+// Push returns ErrNotSupported if the client has disabled push or if push
+// is not supported on the underlying connection.
+Push(target string, opts *PushOptions) error
+}
+
+// HTTP2Config defines HTTP/2 configuration parameters common to
+// both [Transport] and [Server].
+type HTTP2Config struct {
+// MaxConcurrentStreams optionally specifies the number of
+// concurrent streams that a peer may have open at a time.
+// If zero, MaxConcurrentStreams defaults to at least 100.
+MaxConcurrentStreams int
+
+// MaxDecoderHeaderTableSize optionally specifies an upper limit for the
+// size of the header compression table used for decoding headers sent
+// by the peer.
+// A valid value is less than 4MiB.
+// If zero or invalid, a default value is used.
+MaxDecoderHeaderTableSize int
+
+// MaxEncoderHeaderTableSize optionally specifies an upper limit for the
+// header compression table used for sending headers to the peer.
+// A valid value is less than 4MiB.
+// If zero or invalid, a default value is used.
+MaxEncoderHeaderTableSize int
+
+// MaxReadFrameSize optionally specifies the largest frame
+// this endpoint is willing to read.
+// A valid value is between 16KiB and 16MiB, inclusive.
+// If zero or invalid, a default value is used.
+MaxReadFrameSize int
+
+// MaxReceiveBufferPerConnection is the maximum size of the
+// flow control window for data received on a connection.
+// A valid value is at least 64KiB and less than 4MiB.
+// If invalid, a default value is used.
+MaxReceiveBufferPerConnection int
+
+// MaxReceiveBufferPerStream is the maximum size of
+// the flow control window for data received on a stream (request).
+// A valid value is less than 4MiB.
+// If zero or invalid, a default value is used.
+MaxReceiveBufferPerStream int
+
+// SendPingTimeout is the timeout after which a health check using a ping
+// frame will be carried out if no frame is received on a connection.
+// If zero, no health check is performed.
+SendPingTimeout time.Duration
+
+// PingTimeout is the timeout after which a connection will be closed
+// if a response to a ping is not received.
+// If zero, a default of 15 seconds is used.
+PingTimeout time.Duration
+
+// WriteByteTimeout is the timeout after which a connection will be
+// closed if no data can be written to it. The timeout begins when data is
+// available to write, and is extended whenever any bytes are written.
+WriteByteTimeout time.Duration
+
+// PermitProhibitedCipherSuites, if true, permits the use of
+// cipher suites prohibited by the HTTP/2 spec.
+PermitProhibitedCipherSuites bool
+
+// CountError, if non-nil, is called on HTTP/2 errors.
+// It is intended to increment a metric for monitoring.
+// The errType contains only lowercase letters, digits, and underscores
+// (a-z, 0-9, _).
+CountError func(errType string)
+}
 `
 phrases = phrases.split("\n").filter((phrase) => phrase.length > 0 ? phrase : "")
 
@@ -69,15 +251,18 @@ const INPUT =  phrases.join("").split("")
 const WIDTH = longestPhrase.length
 const HEIGHT = phrases.length
 
-let canvas = new Array(WIDTH * HEIGHT).fill(" ")
+const CANVAS_WIDTH = WIDTH * 3
+const CANVAS_HEIGHT = HEIGHT
+
+let canvas = new Array(CANVAS_WIDTH * CANVAS_HEIGHT).fill(" ")
 
 function rotate(position, radian, tick) {
-  let x = position.x / WIDTH - 0.5
-  let y = position.y / HEIGHT - 0.5
+  let x = position.x / CANVAS_WIDTH - 0.5
+  let y = position.y / CANVAS_HEIGHT - 0.5
 
   let distance = Math.sqrt(x * x + y * y)
   
-  radian -= Math.log2(distance)
+  radian -= Math.log2(distance * 2) 
 
   let rotatedX = (x * Math.cos(tick * radian) - y * Math.sin(tick * radian))
   let rotatedY = (x * Math.sin(tick * radian) + y * Math.cos(tick * radian)) 
@@ -90,12 +275,12 @@ function rotate(position, radian, tick) {
 
 function update() {
   canvas = canvas.map((_, index) => {
-    let x = index % WIDTH
-    let y = Math.floor(index / WIDTH)
-    let position = rotate({x: x, y: y}, Math.PI / Math.pow(2, 10), dt / Math.pow(2, 10))    
+    let x = index % CANVAS_WIDTH
+    let y = Math.floor(index / CANVAS_WIDTH)
+    let position = rotate({x: x, y: y}, Math.PI / 32, dt / Math.pow(2, 10))    
   
-    if (position.x >= 0 && position.x < WIDTH 
-        && position.y >= 0 && position.y < HEIGHT) {
+    if (position.x >= 0 && position.x < CANVAS_WIDTH 
+        && position.y >= 0 && position.y < CANVAS_HEIGHT) {
       return INPUT[position.x + position.y * WIDTH]
     }
     
@@ -107,7 +292,7 @@ function update() {
 
 function draw() {
   let output = canvas.reduce((previous, current, index) => {
-    if (index % WIDTH === 0) {
+    if (index % CANVAS_WIDTH === 0) {
       previous += "\n"
     }
 
